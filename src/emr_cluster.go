@@ -74,11 +74,11 @@ func (ec EmrCluster) TerminateJobFlow(jobflowID string) error {
 }
 
 // RunJobFlow builds the params config and launches an EMR cluster
-func (ec EmrCluster) RunJobFlow() (string, error) {
-	return ec.runJobFlow(bootstrapFailureSleepSeconds)
+func (ec EmrCluster) RunJobFlow(async bool) (string, error) {
+	return ec.runJobFlow(bootstrapFailureSleepSeconds, async)
 }
 
-func (ec EmrCluster) runJobFlow(sleepTime int) (string, error) {
+func (ec EmrCluster) runJobFlow(sleepTime int, async bool) (string, error) {
 	params, err := ec.GetJobFlowInput()
 	if err != nil {
 		return "", err
@@ -96,6 +96,10 @@ func (ec EmrCluster) runJobFlow(sleepTime int) (string, error) {
 		}
 
 		log.Info("Launching EMR cluster with name '" + ec.Config.Name + "'...")
+
+		if async {
+			return *resp.JobFlowId, nil
+		}
 
 		clusterStatus, err := ec.waitForState(*resp.JobFlowId, "WAITING",
 			[]string{"TERMINATED_WITH_ERRORS", "TERMINATED", "TERMINATING", "WAITING"})

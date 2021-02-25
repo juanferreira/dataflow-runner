@@ -39,6 +39,7 @@ const (
 	fEmrCluster      = "emr-cluster"
 	fVars            = "vars"
 	fAsync           = "async"
+	fAsyncUp         = "async-up"
 	fLogFailedSteps  = "log-failed-steps"
 	fLogLevel        = "log-level"
 	fLock            = "lock"
@@ -99,11 +100,15 @@ func main() {
 			Flags: []cli.Flag{
 				getEmrConfigFlag(),
 				getVarsFlag(),
+				getAsyncUpFlag(),
 			},
 			Action: func(c *cli.Context) error {
+				asyncUp := c.Bool(fAsyncUp)
+
 				jobflowID, err := up(
 					c.String(fEmrConfig),
 					c.String(fVars),
+					asyncUp,
 				)
 				if err != nil {
 					return exitCodeError(err)
@@ -205,6 +210,7 @@ func main() {
 				getSoftLockFlag(),
 				getConsulFlag(),
 				getVarsFlag(),
+				getAsyncUpFlag(),
 			},
 			Action: func(c *cli.Context) error {
 				emrConfig := c.String(fEmrConfig)
@@ -214,6 +220,7 @@ func main() {
 				softLock := c.String(fSoftLock)
 				consul := c.String(fConsul)
 				vars := c.String(fVars)
+				asyncUp := c.Bool(fAsyncUp)
 
 				clusterRecord, err := parseClusterRecord(emrConfig, vars)
 				if err != nil {
@@ -235,7 +242,7 @@ func main() {
 					return exitCodeError(err)
 				}
 
-				jobflowID, err1 := upWithConfig(clusterRecord)
+				jobflowID, err1 := upWithConfig(clusterRecord, asyncUp)
 				if err1 != nil {
 					if lock != nil && softLock != "" {
 						lock.Unlock()
@@ -302,6 +309,10 @@ func getAsyncFlag() cli.BoolFlag {
 	return cli.BoolFlag{Name: fAsync, Usage: "Asynchronous execution of the jobflow steps"}
 }
 
+func getAsyncUpFlag() cli.BoolFlag {
+	return cli.BoolFlag{Name: fAsyncUp, Usage: "Asynchronous execution of the EMR up step"}
+}
+
 func getLogFailedStepsFlag() cli.BoolFlag {
 	return cli.BoolFlag{
 		Name:  fLogFailedSteps,
@@ -338,21 +349,21 @@ func getConsulFlag() cli.StringFlag {
 // --- Commands
 
 // up launches a new EMR cluster
-func up(emrConfig string, vars string) (string, error) {
+func up(emrConfig string, vars string, async bool) (string, error) {
 	clusterRecord, err := parseClusterRecord(emrConfig, vars)
 	if err != nil {
 		return "", err
 	}
 
-	return upWithConfig(clusterRecord)
+	return upWithConfig(clusterRecord, async)
 }
 
-func upWithConfig(clusterRecord *ClusterConfig) (string, error) {
+func upWithConfig(clusterRecord *ClusterConfig, async bool) (string, error) {
 	ec, err := InitEmrCluster(*clusterRecord)
 	if err != nil {
 		return "", err
 	}
-	jobflowID, err := ec.RunJobFlow()
+	jobflowID, err := ec.RunJobFlow(async)
 	if err != nil {
 		return "", err
 	}
